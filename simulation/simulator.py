@@ -138,36 +138,38 @@ class ECORASimulator:
             # Calculate other metrics
             self._calculate_metrics(offloading_solution)
             
-def _calculate_metrics(self, offloading_solution):
-    # Handle empty solution
-    if len(offloading_solution) == 0:
-        return
-        
-    # Load balance (variance of AP loads)
-    ap_loads = {ap.id: 0 for ap in self.network.access_points}
-    for decision in offloading_solution:
-        if decision == 2:  # Offloaded to AP
-            # Simplified: randomly assign to an AP
-            if self.network.access_points:
-                ap = np.random.choice(self.network.access_points)
-                ap_loads[ap.id] += 1
-                
-    if ap_loads:
-        load_variance = np.var(list(ap_loads.values()))
-        self.results['load_balance'].append(load_variance)
-    else:
-        self.results['load_balance'].append(0)
-        
-    # Cache hit rate (simplified)
-    cache_hits = sum(1 for decision in offloading_solution if decision == 1)
-    hit_rate = cache_hits / len(offloading_solution) if len(offloading_solution) > 0 else 0
-    self.results['cache_hit_rate'].append(hit_rate)
+    # <-- NOTE: The indentation for the following methods is corrected -->
     
-    # Offload success rate
-    offload_success = sum(1 for decision in offloading_solution if decision > 0)
-    success_rate = offload_success / len(offloading_solution) if len(offloading_solution) > 0 else 0
-    self.results['offload_success_rate'].append(success_rate)
+    def _calculate_metrics(self, offloading_solution):
+        # Handle empty solution
+        if len(offloading_solution) == 0:
+            return
+            
+        # Load balance (variance of AP loads)
+        ap_loads = {ap.id: 0 for ap in self.network.access_points}
+        for decision in offloading_solution:
+            if decision == 2:  # Offloaded to AP
+                # Simplified: randomly assign to an AP
+                if self.network.access_points:
+                    ap = np.random.choice(self.network.access_points)
+                    ap_loads[ap.id] += 1
+                    
+        if ap_loads:
+            load_variance = np.var(list(ap_loads.values()))
+            self.results['load_balance'].append(load_variance)
+        else:
+            self.results['load_balance'].append(0)
+            
+        # Cache hit rate (simplified)
+        cache_hits = sum(1 for decision in offloading_solution if decision == 1)
+        hit_rate = cache_hits / len(offloading_solution) if len(offloading_solution) > 0 else 0
+        self.results['cache_hit_rate'].append(hit_rate)
         
+        # Offload success rate
+        offload_success = sum(1 for decision in offloading_solution if decision > 0)
+        success_rate = offload_success / len(offloading_solution) if len(offloading_solution) > 0 else 0
+        self.results['offload_success_rate'].append(success_rate)
+            
     def run(self):
         """Run complete simulation"""
         print("Initializing ECORA simulation...")
