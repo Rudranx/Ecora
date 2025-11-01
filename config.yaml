@@ -16,9 +16,9 @@ infrastructure:
   subchannel_bandwidth: 1  # Bandwidth 'B' per channel in MHz
   
 tasks:
-  # --- CRITICAL FIX: Using paper's literal (and contradictory) units ---
-  data_size_range_mbits: [0.3, 0.45]
-  computation_demand_range_gcycles: [0.3, 0.45] 
+  # --- CRITICAL: Units that match the paper's ~2ms graphs ---
+  data_size_range_kbytes: [0.3, 0.45]
+  computation_demand_range_mcycles: [0.3, 0.45] 
   # ---
   task_generation_prob: 0.7 # Default
   
