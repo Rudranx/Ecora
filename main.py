@@ -2,112 +2,168 @@ import matplotlib.pyplot as plt
 import numpy as np
 from simulation.simulator import ECORASimulator
 import traceback
+import copy
 
-def plot_results(results):
-    """Plot simulation results (Performance vs. Time)"""
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-    
-    # Average delay
-    if results['average_delay']:
-        # Filter out inf values
-        filtered_delays = [d for d in results['average_delay'] if d != float('inf') and d < 100]
-        if filtered_delays:
-            axes[0, 0].plot(filtered_delays)
-    axes[0, 0].set_title('Average Task Processing Delay')
-    axes[0, 0].set_xlabel('Time Slot')
-    axes[0, 0].set_ylabel('Delay (ms)')
-    axes[0, 0].grid(True)
-    
-    # Load balance
-    axes[0, 1].plot(results['load_balance'])
-    axes[0, 1].set_title('Load Balance (Variance)')
-    axes[0, 1].set_xlabel('Time Slot')
-    axes[0, 1].set_ylabel('Load Variance')
-    axes[0, 1].grid(True)
-    
-    # Cache hit rate
-    axes[1, 0].plot(results['cache_hit_rate'])
-    axes[1, 0].set_title('Cache Hit Rate')
-    axes[1, 0].set_xlabel('Time Slot')
-    axes[1, 0].set_ylabel('Hit Rate')
-    axes[1, 0].grid(True)
-    
-    # Offload success rate
-    axes[1, 1].plot(results['offload_success_rate'])
-    axes[1, 1].set_title('Offload Success Rate')
-    axes[1, 1].set_xlabel('Time Slot')
-    axes[1, 1].set_ylabel('Success Rate')
-    axes[1, 1].grid(True)
-    
-    plt.tight_layout()
-    plt.savefig('ecora_timeseries_results.png')
-    # plt.show() # Disabled to show convergence plot
-    print("\nSaved time-series graphs to 'ecora_timeseries_results.png'")
-
-
-def plot_convergence_graph(history):
+def run_experiment(config_file: str, sim_params: dict):
     """
-    Plots the convergence of the cuckoo search algorithm
-    (Delay vs. Iterations)
-    This replicates the graphs from the paper (e.g., Fig 2a)
+    Runs a single simulation with specific parameters
+    and returns the convergence history (in SECONDS).
     """
+    print(f"--- Running experiment with params: {sim_params} ---")
+    
+    simulator = ECORASimulator(config_file, sim_params)
+    simulator.initialize_network()
+    
+    # --- FIX for 0 tasks ---
+    # We must run at least one trial that *has* tasks.
+    history = None
+    for i in range(10): # Try up to 10 times
+        simulator.current_time = i
+        history = simulator.run_time_slot()
+        if history: # If tasks were generated, history is not empty
+            break
+            
     if not history:
-        print("Could not generate convergence graph: No history received.")
-        return
-        
+        print("--- Experiment finished. No tasks generated, no history. ---")
+        max_iter = simulator.config['algorithms']['cuckoo']['max_iterations']
+        return [100.0] * (max_iter + 1) # Return 100s penalty
+    # --- END FIX ---
+
+    max_iter = simulator.config['algorithms']['cuckoo']['max_iterations']
+    if len(history) < (max_iter + 1):
+        last_val = history[-1]
+        padding = [last_val] * ((max_iter + 1) - len(history))
+        history.extend(padding)
+
+    print(f"--- Experiment finished. Final delay: {history[-1] * 1000:.4f} ms ---")
+    return history
+
+
+def plot_figure(results: dict, title: str, filename: str, xlabel: str):
+    """
+    Generic plotting function for convergence graphs (Figs 2, 3, 4)
+    """
     plt.figure(figsize=(10, 6))
-    plt.plot(history, marker='o', linestyle='-')
-    plt.title('ECORA Algorithm Convergence (from Time Slot 0)')
+    
+    x_ticks_paper = np.arange(0, 26, 5)
+    
+    for label, history_s in results.items():
+        if history_s:
+            # --- CRITICAL FIX: Convert Seconds to Milliseconds for plotting ---
+            history_ms = [s * 1000 for s in history_s]
+            plt.plot(history_ms, label=f"ECORA ({label})", marker='o', markersize=4, linestyle='-') 
+        
+    plt.title(title)
     plt.xlabel('The number of iterations(times)')
-    plt.ylabel('Average task processing latency (ms)')
+    plt.ylabel('Average task processing latency (ms)') # Label is now correct
+    plt.legend()
     plt.grid(True)
-    plt.savefig('ecora_convergence.png')
-    print("Saved convergence graph to 'ecora_convergence.png'")
+    plt.xticks(x_ticks_paper)
+    plt.xlim(0, 25)
+    plt.savefig(filename)
+    print(f"\nSaved Figure to '{filename}'")
     plt.show()
 
 
-def print_statistics(results):
-    """Print summary statistics"""
-    print("\n" + "="*50)
-    print("ECORA SIMULATION RESULTS SUMMARY (OVER 1000 SLOTS)")
-    print("="*50)
-    
-    if results['average_delay']:
-        # Filter out inf values
-        filtered_delays = [d for d in results['average_delay'] if d != float('inf') and d < 100]
-        if filtered_delays:
-            print(f"Average Task Processing Delay: {np.mean(filtered_delays):.4f} ms")
-            print(f"Min Delay: {np.min(filtered_delays):.4f} ms")
-            print(f"Max Delay: {np.max(filtered_delays):.4f} ms")
-        else:
-            print("No valid delay measurements")
-        
-    if results['load_balance']:
-        print(f"\nLoad Balance Variance: {np.mean(results['load_balance']):.4f}")
-        
-    if results['cache_hit_rate']:
-        print(f"\nAverage Cache Hit Rate: {np.mean(results['cache_hit_rate']):.2%}")
-        
-    if results['offload_success_rate']:
-        print(f"Average Offload Success Rate: {np.mean(results['offload_success_rate']):.2%}")
-        
-    print("="*50)
-
 if __name__ == "__main__":
+    CONFIG_FILE = 'config.yaml'
+    
     try:
-        # Run simulation
-        simulator = ECORASimulator('config.yaml')
+        # ---
+        # --- Figure 2: Varying Traffic Density ---
+        # ---
+        print("\n" + "="*50)
+        print("RUNNING FIGURE 2 EXPERIMENT (TRAFFIC DENSITY)")
+        print("="*50)
+        traffic_densities = [0.06, 0.08, 0.10, 0.12]
+        fig_2_results = {}
         
-        # results contains the 1000-slot data
-        # convergence_history contains the iteration data from slot 0
-        results, convergence_history = simulator.run()
+        for density in traffic_densities:
+            params = {
+                'task_generation_prob': density,
+                'average_speed_kmh': 60 
+            }
+            history = run_experiment(CONFIG_FILE, params)
+            fig_2_results[f"Density={density}"] = history
+            
+        plot_figure(
+            fig_2_results,
+            'Fig 2 (ECORA): Avg. Delay vs. Iterations (Varying Traffic Density)',
+            'ecora_figure_2_traffic_density.png',
+            'Traffic Density (as Task Gen. Prob.)'
+        )
+
+        # ---
+        # --- Figure 3: Varying Average Speed ---
+        # ---
+        print("\n" + "="*50)
+        print("RUNNING FIGURE 3 EXPERIMENT (AVERAGE SPEED)")
+        print("="*50)
+        average_speeds = [30, 60, 90, 120]
+        fig_3_results = {}
         
-        # Display results
-        print_statistics(results)
-        plot_results(results)
+        for speed in average_speeds:
+            params = {
+                'task_generation_prob': 0.10, # Use a constant density
+                'average_speed_kmh': speed
+            }
+            history = run_experiment(CONFIG_FILE, params)
+            fig_3_results[f"Speed={speed} km/h"] = history
+            
+        plot_figure(
+            fig_3_results,
+            'Fig 3 (ECORA): Avg. Delay vs. Iterations (Varying Average Speed)',
+            'ecora_figure_3_average_speed.png',
+            'Average Speed (km/h)'
+        )
+
+        # ---
+        # --- Figure 4: Varying Algorithm Parameters (Pa and alpha3) ---
+        # ---
+        print("\n" + "="*50)
+        print("RUNNING FIGURE 4a EXPERIMENT (Varying Pa)")
+        print("="*50)
+        pa_values = [0.05, 0.15, 0.25, 0.35, 0.45]
+        fig_4a_results = {}
         
-        # PLOT THE NEW CONVERGENCE GRAPH
-        plot_convergence_graph(convergence_history)
+        base_params_fig4 = {
+            'task_generation_prob': 0.10,
+            'average_speed_kmh': 60
+        }
+        
+        for pa in pa_values:
+            params = copy.deepcopy(base_params_fig4)
+            params['discovery_probability'] = pa 
+            
+            history = run_experiment(CONFIG_FILE, params)
+            fig_4a_results[f"Pa={pa}"] = history
+            
+        plot_figure(
+            fig_4a_results,
+            'Fig 4a (ECORA): Avg. Delay vs. Iterations (Varying Pa)',
+            'ecora_figure_4a_pa.png',
+            'Parameter Pa (discovery_probability)'
+        )
+        
+        print("\n" + "="*50)
+        print("RUNNING FIGURE 4b EXPERIMENT (Varying alpha3)")
+        print("="*50)
+        alpha3_values = [0.01, 0.1, 1, 5, 10]
+        fig_4b_results = {}
+        
+        for a3 in alpha3_values:
+            params = copy.deepcopy(base_params_fig4)
+            params['step_size_factor'] = a3 
+            
+            history = run_experiment(CONFIG_FILE, params)
+            fig_4b_results[f"a3={a3}"] = history
+            
+        plot_figure(
+            fig_4b_results,
+            'Fig 4b (ECORA): Avg. Delay vs. Iterations (Varying a3)',
+            'ecora_figure_4b_alpha3.png',
+            'Parameter a3 (step_size_factor)'
+        )
         
     except Exception as e:
         print(f"Error during simulation: {e}")
