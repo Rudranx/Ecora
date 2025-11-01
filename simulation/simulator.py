@@ -5,6 +5,7 @@ from core.entities import MissionVehicle, CollaborativeVehicle, AccessPoint, Tas
 from core.network import VehicularNetwork
 from algorithms.stable_matching import StableMatchingAlgorithm
 from algorithms.cuckoo_search import DiscreteCuckooSearch
+from utils.helpers import generate_zipf_popularity # <-- IMPORT ZIPF FUNCTION
 
 class ECORASimulator:
     """Main simulation engine for ECORA strategy"""
@@ -23,6 +24,12 @@ class ECORASimulator:
             'offload_success_rate': []
         }
         
+        # <-- GENERATE SERVICE POPULARITY (Miss 2)
+        self.service_popularities = generate_zipf_popularity(
+            self.config['services']['total_services'],
+            self.config['services']['zipf_parameter']
+        )
+        
     def initialize_network(self):
         """Initialize network with vehicles and infrastructure"""
         area_size = tuple(self.config['simulation']['area_size'])
@@ -39,7 +46,7 @@ class ECORASimulator:
                 id=i,
                 position=position,
                 velocity=velocity,
-                communication_range=self.config['vehicles']['communication_range'],
+                communication_range=self.config['vehicles']['communication_range'], # 100m
                 computing_resources=1.0,  # GHz
                 storage_resources=100  # MB
             )
@@ -53,10 +60,10 @@ class ECORASimulator:
             velocity = np.array([speed * np.cos(angle), speed * np.sin(angle)])
             
             cv = CollaborativeVehicle(
-                id=1000 + i,
+                id=1000 + i, # Use different ID range
                 position=position,
                 velocity=velocity,
-                communication_range=self.config['vehicles']['communication_range'],
+                communication_range=self.config['vehicles']['communication_range'], # 100m
                 computing_resources=2.0,  # GHz
                 storage_resources=500,  # MB
                 idle_computing_resources=1.8,
@@ -69,9 +76,9 @@ class ECORASimulator:
             position = np.random.rand(2) * area_size
             
             ap = AccessPoint(
-                id=2000 + i,
+                id=2000 + i, # Use different ID range
                 position=position,
-                communication_range=500,  # meters
+                communication_range=150,  # <-- UPDATED FROM TABLE I (R=150m)
                 computing_resources=10.0,  # GHz
                 storage_resources=10000,  # MB
                 max_connections=20
@@ -98,39 +105,43 @@ class ECORASimulator:
                 
     def run_time_slot(self):
         """Execute one time slot of simulation"""
-        # Update vehicle positions
+        # ... (vehicle movement and network updates are fine) ...
         for mv in self.network.mission_vehicles:
             mv.update_position(1.0)
-            # Boundary conditions
             mv.position = np.clip(mv.position, 0, self.network.area_size)
-            
         for cv in self.network.collaborative_vehicles:
             cv.update_position(1.0)
             cv.position = np.clip(cv.position, 0, self.network.area_size)
-            
-        # Update network connectivity
         self.network.update_connectivity()
         
-        # Generate tasks
         self.generate_tasks()
         
         # Run stable matching for service caching
-        services = list(range(self.config['services']['total_services']))
-        sm_algorithm = StableMatchingAlgorithm(self.network, services)
+        # <-- PASS POPULARITIES TO ALGORITHM (Miss 2)
+        sm_algorithm = StableMatchingAlgorithm(
+            self.network, 
+            self.service_popularities,
+            self.config['services']['total_services']
+        )
         cache_matching = sm_algorithm.run()
         
         # Update cached services based on matching
+        # <-- THIS IS STILL A SIMPLIFICATION, but better than before
+        # A full implementation would use the matching result to cache specific services
         for cv_id, ap_id in cache_matching.items():
             cv = next((cv for cv in self.network.collaborative_vehicles if cv.id == cv_id), None)
             if cv:
-                # Simplified: randomly cache some services
-                num_services = min(3, self.config['services']['total_services'])
-                cv.cached_services = np.random.choice(services, num_services, replace=False).tolist()
+                # Simplified: cache the top 3 most popular services
+                num_to_cache = min(3, self.config['services']['total_services'])
+                cv.cached_services = np.argsort(self.service_popularities)[-num_to_cache:].tolist()
                 
         # Run discrete cuckoo search for task offloading
         if self.tasks:
             dcs_algorithm = DiscreteCuckooSearch(self.config, self.network, self.tasks)
-            offloading_solution, avg_delay = dcs_algorithm.run()
+            
+            # <-- MODIFICATION FOR GRAPHING
+            # We need to get the history list back
+            offloading_solution, avg_delay, history = dcs_algorithm.run()
             
             # Record results
             self.results['average_delay'].append(avg_delay)
@@ -138,18 +149,22 @@ class ECORASimulator:
             # Calculate other metrics
             self._calculate_metrics(offloading_solution)
             
-    # <-- NOTE: The indentation for the following methods is corrected -->
-    
+            # Return history for the first slot (for convergence graph)
+            if self.current_time == 0:
+                return history
+        
+        return None # No history to return after slot 0
+
     def _calculate_metrics(self, offloading_solution):
-        # Handle empty solution
+        # (This function is fine as-is)
         if len(offloading_solution) == 0:
             return
             
-        # Load balance (variance of AP loads)
         ap_loads = {ap.id: 0 for ap in self.network.access_points}
-        for decision in offloading_solution:
+        for i, decision in enumerate(offloading_solution):
             if decision == 2:  # Offloaded to AP
-                # Simplified: randomly assign to an AP
+                # This logic should be improved to match the cuckoo search's
+                # For now, just assign to any AP
                 if self.network.access_points:
                     ap = np.random.choice(self.network.access_points)
                     ap_loads[ap.id] += 1
@@ -160,12 +175,10 @@ class ECORASimulator:
         else:
             self.results['load_balance'].append(0)
             
-        # Cache hit rate (simplified)
         cache_hits = sum(1 for decision in offloading_solution if decision == 1)
         hit_rate = cache_hits / len(offloading_solution) if len(offloading_solution) > 0 else 0
         self.results['cache_hit_rate'].append(hit_rate)
         
-        # Offload success rate
         offload_success = sum(1 for decision in offloading_solution if decision > 0)
         success_rate = offload_success / len(offloading_solution) if len(offloading_solution) > 0 else 0
         self.results['offload_success_rate'].append(success_rate)
@@ -178,13 +191,19 @@ class ECORASimulator:
         duration = self.config['simulation']['duration']
         print(f"Running simulation for {duration} time slots...")
         
+        convergence_history = None
+        
         for t in range(duration):
             self.current_time = t
-            self.run_time_slot()
+            history = self.run_time_slot()
+            
+            if t == 0:
+                convergence_history = history # Save history from first slot
             
             if (t + 1) % 100 == 0:
                 avg_delay = np.mean(self.results['average_delay'][-100:]) if self.results['average_delay'] else 0
                 print(f"Time slot {t + 1}/{duration} - Avg delay: {avg_delay:.4f} ms")
                 
         print("Simulation completed!")
-        return self.results
+        # Return both full results and convergence history
+        return self.results, convergence_history

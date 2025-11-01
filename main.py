@@ -4,7 +4,7 @@ from simulation.simulator import ECORASimulator
 import traceback
 
 def plot_results(results):
-    """Plot simulation results"""
+    """Plot simulation results (Performance vs. Time)"""
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
     
     # Average delay
@@ -40,13 +40,36 @@ def plot_results(results):
     axes[1, 1].grid(True)
     
     plt.tight_layout()
-    plt.savefig('ecora_results.png')
+    plt.savefig('ecora_timeseries_results.png')
+    # plt.show() # Disabled to show convergence plot
+    print("\nSaved time-series graphs to 'ecora_timeseries_results.png'")
+
+
+def plot_convergence_graph(history):
+    """
+    Plots the convergence of the cuckoo search algorithm
+    (Delay vs. Iterations)
+    This replicates the graphs from the paper (e.g., Fig 2a)
+    """
+    if not history:
+        print("Could not generate convergence graph: No history received.")
+        return
+        
+    plt.figure(figsize=(10, 6))
+    plt.plot(history, marker='o', linestyle='-')
+    plt.title('ECORA Algorithm Convergence (from Time Slot 0)')
+    plt.xlabel('The number of iterations(times)')
+    plt.ylabel('Average task processing latency (ms)')
+    plt.grid(True)
+    plt.savefig('ecora_convergence.png')
+    print("Saved convergence graph to 'ecora_convergence.png'")
     plt.show()
-    
+
+
 def print_statistics(results):
     """Print summary statistics"""
     print("\n" + "="*50)
-    print("ECORA SIMULATION RESULTS SUMMARY")
+    print("ECORA SIMULATION RESULTS SUMMARY (OVER 1000 SLOTS)")
     print("="*50)
     
     if results['average_delay']:
@@ -74,11 +97,18 @@ if __name__ == "__main__":
     try:
         # Run simulation
         simulator = ECORASimulator('config.yaml')
-        results = simulator.run()
+        
+        # results contains the 1000-slot data
+        # convergence_history contains the iteration data from slot 0
+        results, convergence_history = simulator.run()
         
         # Display results
         print_statistics(results)
         plot_results(results)
+        
+        # PLOT THE NEW CONVERGENCE GRAPH
+        plot_convergence_graph(convergence_history)
+        
     except Exception as e:
         print(f"Error during simulation: {e}")
         traceback.print_exc()
