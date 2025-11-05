@@ -551,6 +551,651 @@ Simulation Complete!
 
 **Total Lines of Code:** ~2,600+
 
+
+# ECORA Project Mermaid Diagrams
+
+## 1. System Architecture Overview
+
+```mermaid
+graph TB
+    subgraph "Physical Layer"
+        MV[Mission Vehicles<br/>Generate Tasks]
+        CV[Collaborative Vehicles<br/>Provide Resources]
+        AP[Access Points / RSUs<br/>Edge Servers]
+    end
+    
+    subgraph "Mobile Social Layer"
+        IS[Interest Similarity]
+        ST[Social Trust]
+        MC[Movement Correlation]
+    end
+    
+    subgraph "ECORA Framework"
+        SC[Service Caching<br/>Stable Matching]
+        TO[Task Offloading<br/>Cuckoo Search + DE]
+    end
+    
+    MV -->|Generate Tasks| TO
+    CV -->|Cache Services| SC
+    AP -->|Provide Computing| TO
+    
+    IS --> SC
+    ST --> SC
+    MC --> TO
+    
+    SC -->|Cached Services| CV
+    TO -->|Offloading Decisions| MV
+    TO -->|Resource Allocation| CV
+    TO -->|Resource Allocation| AP
+    
+    style MV fill:#ff9999,color:#000000,stroke:#333,stroke-width:2px
+    style CV fill:#99ccff,color:#000000,stroke:#333,stroke-width:2px
+    style AP fill:#99ff99,color:#000000,stroke:#333,stroke-width:2px
+    style SC fill:#ffcc99,color:#000000,stroke:#333,stroke-width:2px
+    style TO fill:#cc99ff,color:#000000,stroke:#333,stroke-width:2px
+    style IS fill:#e1e1e1,color:#000000,stroke:#333,stroke-width:1px
+    style ST fill:#e1e1e1,color:#000000,stroke:#333,stroke-width:1px
+    style MC fill:#e1e1e1,color:#000000,stroke:#333,stroke-width:1px
+```
+
+## 3. Class/Module Relationships
+
+```mermaid
+classDiagram
+    class ECORASimulator {
+        +VehicularNetwork network
+        +dict config
+        +int current_time
+        +initialize_network()
+        +run_time_slot()
+        +generate_tasks()
+    }
+    
+    class VehicularNetwork {
+        +list mission_vehicles
+        +list collaborative_vehicles
+        +list access_points
+        +numpy area_size
+        +create_vehicles()
+        +create_access_points()
+        +calculate_distances()
+    }
+    
+    class MissionVehicle {
+        +int id
+        +tuple position
+        +float compute_resources
+        +float speed
+        +generate_task()
+        +update_position()
+    }
+    
+    class CollaborativeVehicle {
+        +int id
+        +tuple position
+        +float compute_resources
+        +float storage_capacity
+        +dict cached_services
+        +cache_service()
+        +has_service()
+    }
+    
+    class AccessPoint {
+        +int id
+        +tuple position
+        +float compute_resources
+        +float communication_range
+        +int max_connections
+        +accept_connection()
+    }
+    
+    class Task {
+        +int id
+        +float data_size
+        +float computation_demand
+        +int service_type
+        +float generation_time
+        +float deadline
+    }
+    
+    class StableMatchingAlgorithm {
+        +dict ap_preferences
+        +dict cv_preferences
+        +calculate_preferences()
+        +perform_matching()
+        +is_stable()
+    }
+    
+    class CuckooSearchAlgorithm {
+        +int nest_size
+        +int max_iterations
+        +float discovery_prob
+        +numpy population
+        +initialize_population()
+        +levy_flight()
+        +differential_evolution()
+        +optimize()
+    }
+    
+    class SocialMetrics {
+        +calculate_interest_similarity()
+        +calculate_social_trust()
+        +calculate_connection_strength()
+    }
+    
+    class MobilityModel {
+        +calculate_movement_correlation()
+        +update_positions()
+        +predict_trajectory()
+    }
+    
+    class CacheModel {
+        +float zipf_parameter
+        +calculate_popularity()
+        +generate_zipf_distribution()
+    }
+    
+    ECORASimulator --> VehicularNetwork
+    ECORASimulator --> StableMatchingAlgorithm
+    ECORASimulator --> CuckooSearchAlgorithm
+    
+    VehicularNetwork --> MissionVehicle
+    VehicularNetwork --> CollaborativeVehicle
+    VehicularNetwork --> AccessPoint
+    
+    MissionVehicle --> Task
+    
+    StableMatchingAlgorithm --> SocialMetrics
+    StableMatchingAlgorithm --> MobilityModel
+    StableMatchingAlgorithm --> CacheModel
+    
+    CuckooSearchAlgorithm --> Task
+    CuckooSearchAlgorithm --> CollaborativeVehicle
+    CuckooSearchAlgorithm --> AccessPoint
+    
+    style ECORASimulator fill:#ffcc99,color:#000000
+    style VehicularNetwork fill:#99ccff,color:#000000
+    style MissionVehicle fill:#ff9999,color:#000000
+    style CollaborativeVehicle fill:#99ccff,color:#000000
+    style AccessPoint fill:#99ff99,color:#000000
+    style Task fill:#ffff99,color:#000000
+    style StableMatchingAlgorithm fill:#ffcc99,color:#000000
+    style CuckooSearchAlgorithm fill:#cc99ff,color:#000000
+```
+
+## 4. Data Flow Diagram
+
+```mermaid
+flowchart LR
+    subgraph Input[Input Layer]
+        Config[config.yaml<br/>Parameters]
+        UserParams[User Override<br/>Parameters]
+    end
+    
+    subgraph Initialization[Initialization Phase]
+        Config --> Sim[ECORASimulator]
+        UserParams --> Sim
+        Sim --> Net[VehicularNetwork]
+        Net --> CreateMV[Create MVs]
+        Net --> CreateCV[Create CVs]
+        Net --> CreateAP[Create APs]
+    end
+    
+    subgraph Processing["Processing Layer"]
+        CreateMV --> TaskGen[Task Generation]
+        TaskGen --> Tasks[(Task Pool)]
+        
+        Tasks --> Stage1[Stage 1:<br/>Service Caching]
+        CreateCV --> Stage1
+        CreateAP --> Stage1
+        
+        Stage1 --> SocialCalc[Calculate Social<br/>Metrics]
+        Stage1 --> MobilityCalc[Calculate Mobility<br/>Correlation]
+        Stage1 --> PopCalc[Calculate Service<br/>Popularity]
+        
+        SocialCalc --> Matching[Stable Matching]
+        MobilityCalc --> Matching
+        PopCalc --> Matching
+        
+        Matching --> CacheDecisions[(Cache Decisions)]
+        
+        CacheDecisions --> Stage2[Stage 2:<br/>Task Offloading]
+        Tasks --> Stage2
+        
+        Stage2 --> InitPop[Initialize Population]
+        InitPop --> GlobalSearch[Global Search<br/>Lévy Flight]
+        GlobalSearch --> LocalSearch[Local Search<br/>DE Operators]
+        LocalSearch --> BestSol[Best Solution]
+        
+        BestSol --> OffloadDecisions[(Offload Decisions)]
+    end
+    
+    subgraph Execution[Execution Layer]
+        OffloadDecisions --> Execute[Execute Offloading]
+        CacheDecisions --> Execute
+        Execute --> ComputeTasks[Compute Tasks]
+        ComputeTasks --> Results[(Results)]
+    end
+    
+    subgraph Output[Output Layer]
+        Results --> Metrics[Calculate Metrics]
+        Metrics --> Delay[Avg Delay]
+        Metrics --> LoadBalance[AP Load Balance]
+        Metrics --> Convergence[Convergence History]
+        
+        Delay --> Vis[Visualization]
+        LoadBalance --> Vis
+        Convergence --> Vis
+        
+        Vis --> Figures[Output Figures<br/>PNG Files]
+    end
+    
+    style Input fill:#e1e1e1,color:#000000,stroke:#333,stroke-width:1px
+    style Initialization fill:#99ccff,color:#000000,stroke:#333,stroke-width:1px
+    style Processing fill:#ffcc99,color:#000000,stroke:#333,stroke-width:1px
+    style Execution fill:#99ff99,color:#000000,stroke:#333,stroke-width:1px
+    style Output fill:#cc99ff,color:#000000,stroke:#333,stroke-width:1px
+    style Stage1 fill:#ffcc99,color:#000000,stroke:#333,stroke-width:2px
+    style Stage2 fill:#cc99ff,color:#000000,stroke:#333,stroke-width:2px
+    style Execute fill:#99ff99,color:#000000,stroke:#333,stroke-width:2px
+    style Figures fill:#ffff99,color:#000000,stroke:#333,stroke-width:2px
+```
+
+## 5. Stable Matching Algorithm Details
+
+```mermaid
+stateDiagram-v2
+    [*] --> Initialize: Start Stable Matching
+    
+    Initialize --> CalcAPPref: Calculate AP Preferences
+    CalcAPPref --> CalcCVPref: Y_AP = θ·QoS/t_upload
+    
+    CalcCVPref --> CreateLists: Y_CV = D·QR/(1+e^-ρ)
+    CreateLists --> Propose: Create Preference Lists
+    
+    Propose --> CVPropose: CV Sends Request to Top AP
+    
+    CVPropose --> CheckAPLoad: CV Proposes to Preferred AP
+    
+    CheckAPLoad --> Accept: AP Load < Max?
+    CheckAPLoad --> Compare: AP Load = Max?
+    CheckAPLoad --> Reject: AP Load > Max?
+    
+    Accept --> UpdateMatch: AP Accepts CV
+    UpdateMatch --> RemoveFromUnmatched
+    
+    Compare --> CheckPref: Compare with Current Matches
+    CheckPref --> ReplaceMatch: CV Better than Worst?
+    CheckPref --> Reject: CV Worse than All?
+    
+    ReplaceMatch --> AddToUnmatched: Reject Previous CV
+    AddToUnmatched --> UpdateMatch
+    
+    Reject --> RemoveFromCVList: Remove AP from CV's List
+    RemoveFromCVList --> CheckUnmatched
+    
+    RemoveFromUnmatched --> CheckUnmatched: Check if Done
+    
+    CheckUnmatched --> Propose: Unmatched CVs Exist?
+    CheckUnmatched --> CheckStability: All CVs Matched or Exhausted?
+    
+    CheckStability --> Output: Check for Blocking Pairs
+    Output --> [*]: Return Stable Matching
+    
+    note right of CalcAPPref
+        AP Preference Metric:
+        - Social Connection θ
+        - QoS Quality
+        - Upload Time
+    end note
+    
+    note right of CalcCVPref
+        CV Preference Metric:
+        - Movement Correlation D
+        - Channel Quality QR
+        - Service Popularity ρ
+    end note
+```
+
+## 6. Cuckoo Search with DE Algorithm Details
+
+```mermaid
+stateDiagram-v2
+    [*] --> InitPop: Initialize Population
+    InitPop --> EvalFitness: Evaluate All Nests
+    EvalFitness --> FindBest: Find Global Best
+    
+    FindBest --> IterCheck: iteration < max?
+    
+    state IterCheck <<choice>>
+    IterCheck --> GlobalPhase: Yes
+    IterCheck --> [*]: No - Return Best
+    
+    state GlobalPhase {
+        [*] --> LevyFlight: Generate Lévy Step
+        LevyFlight --> UpdatePos: x_new = x + α·Lévy·(x_best - x)
+        UpdatePos --> Discretize1: Discretize to Binary
+        Discretize1 --> EvalNew1: Evaluate Fitness
+        EvalNew1 --> CompareGlobal: Compare with Current
+        
+        state CompareGlobal <<choice>>
+        CompareGlobal --> UpdateGlobal: Better
+        CompareGlobal --> KeepOld1: Worse
+        
+        UpdateGlobal --> [*]
+        KeepOld1 --> [*]
+    }
+    
+    GlobalPhase --> DiscoverCheck: Random < Pa?
+    
+    state DiscoverCheck <<choice>>
+    DiscoverCheck --> LocalPhase: Yes - Abandon Nest
+    DiscoverCheck --> NextIter: No - Keep Nest
+    
+    state LocalPhase {
+        [*] --> Mutation: Differential Mutation
+        
+        state Mutation {
+            [*] --> SelectParents: Select p, q randomly
+            SelectParents --> CalcMutation: u = x + κ·(x_p - x_q)
+            CalcMutation --> [*]
+        }
+        
+        Mutation --> Crossover: Crossover Operation
+        
+        state Crossover {
+            [*] --> BinCross: Binary Crossover
+            BinCross --> CalcCross: v = mix(u, x, CR)
+            CalcCross --> [*]
+        }
+        
+        Crossover --> Discretize2: Discretize to Binary
+        Discretize2 --> EvalNew2: Evaluate Fitness
+        EvalNew2 --> CompareLocal: Compare with Current
+        
+        state CompareLocal <<choice>>
+        CompareLocal --> UpdateLocal: Better
+        CompareLocal --> KeepOld2: Worse
+        
+        UpdateLocal --> [*]
+        KeepOld2 --> [*]
+    }
+    
+    LocalPhase --> UpdateGlobalBest
+    NextIter --> UpdateGlobalBest: Update Global Best
+    
+    UpdateGlobalBest --> IterCheck: Increment Iteration
+    
+    note right of GlobalPhase
+        Lévy Flight:
+        u ~ N(0, σ²_u)
+        v ~ N(0, 1)
+        σ_u from Mantegna
+    end note
+    
+    note right of LocalPhase
+        DE Parameters:
+        κ = 0.5 (scaling)
+        CR = 0.9 (crossover)
+    end note
+```
+
+## 7. Task Processing Flow
+
+```mermaid
+sequenceDiagram
+    participant MV as Mission Vehicle
+    participant Net as Network
+    participant SM as Stable Matching
+    participant CV as Collaborative Vehicle
+    participant CS as Cuckoo Search
+    participant AP as Access Point
+    
+    Note over MV,AP: Time Slot Begins
+    
+    MV->>Net: Generate Task(ω, c, f, t_gen, t_deadline)
+    Net->>Net: Collect All Tasks
+    
+    Note over SM,CV: Stage 1: Service Caching
+    
+    Net->>SM: Request Service Caching
+    SM->>CV: Calculate CV Preferences
+    SM->>AP: Calculate AP Preferences
+    
+    CV->>SM: Send Proposal to Preferred AP
+    AP->>SM: Accept/Reject based on Load
+    
+    SM->>CV: Stable Matching Result
+    CV->>CV: Cache Popular Services
+    
+    Note over CS,AP: Stage 2: Task Offloading
+    
+    Net->>CS: Optimize Task Offloading
+    CS->>CS: Initialize Population (25 nests)
+    
+    loop For each iteration (max 25)
+        CS->>CS: Lévy Flight (Global Search)
+        CS->>CV: Check Resource Availability
+        CS->>AP: Check Resource Availability
+        CS->>CS: Evaluate Delay
+        
+        alt Random < Pa (0.25)
+            CS->>CS: DE Mutation
+            CS->>CS: DE Crossover
+            CS->>CS: DE Selection
+        end
+        
+        CS->>CS: Update Best Solution
+    end
+    
+    CS->>Net: Return Best Offloading Decision
+    
+    Note over MV,AP: Execute Offloading
+    
+    alt Offload to CV
+        Net->>CV: Upload Task Data (ω)
+        CV->>CV: Compute Task (c/c_m,n)
+        CV->>MV: Return Result
+    else Offload to AP
+        Net->>AP: Upload Task Data (ω)
+        AP->>AP: Compute Task (c/c_m,k)
+        AP->>MV: Return Result
+    end
+    
+    MV->>Net: Record Completion Delay
+    Net->>Net: Calculate Performance Metrics
+    
+    Note over MV,AP: Time Slot Ends
+```
+
+## 8. Performance Comparison
+
+```mermaid
+graph LR
+    subgraph "Algorithms"
+        ECORA[ECORA<br/>This Implementation]
+        PSO[PSO Baseline<br/>From Paper]
+        GA[GA Baseline<br/>From Paper]
+    end
+    
+    subgraph "Key Metrics"
+        Delay[Average Delay]
+        Conv[Convergence Speed]
+        Load[Load Balance]
+        Time[Computation Time]
+    end
+    
+    ECORA -->|0.662 ms| Delay
+    PSO -->|0.718 ms| Delay
+    GA -->|0.733 ms| Delay
+    
+    ECORA -->|15-20 iter| Conv
+    PSO -->|50-60 iter| Conv
+    GA -->|80-100 iter| Conv
+    
+    ECORA -->|97.5% reduction| Load
+    PSO -->|baseline| Load
+    GA -->|worse| Load
+    
+    ECORA -->|0.045 s| Time
+    PSO -->|0.142 s| Time
+    GA -->|0.235 s| Time
+    
+    subgraph "Improvements"
+        I1[7.59% better than PSO]
+        I2[9.98% better than GA]
+        I3[3-6× faster convergence]
+    end
+    
+    Delay --> I1
+    Delay --> I2
+    Conv --> I3
+    
+    style ECORA fill:#99ff99,color:#000000,stroke:#333,stroke-width:2px
+    style PSO fill:#ffcc99,color:#000000,stroke:#333,stroke-width:2px
+    style GA fill:#ffcc99,color:#000000,stroke:#333,stroke-width:2px
+    style I1 fill:#00ff00,color:#000000,stroke:#333,stroke-width:1px
+    style I2 fill:#00ff00,color:#000000,stroke:#333,stroke-width:1px
+    style I3 fill:#00ff00,color:#000000,stroke:#333,stroke-width:1px
+    style Delay fill:#e1e1e1,color:#000000,stroke:#333,stroke-width:1px
+    style Conv fill:#e1e1e1,color:#000000,stroke:#333,stroke-width:1px
+    style Load fill:#e1e1e1,color:#000000,stroke:#333,stroke-width:1px
+    style Time fill:#e1e1e1,color:#000000,stroke:#333,stroke-width:1px
+```
+
+## 9. Configuration Hierarchy
+
+```mermaid
+graph TD
+    Root[config.yaml] --> Sim[Simulation Config]
+    Root --> Veh[Vehicle Config]
+    Root --> Infra[Infrastructure Config]
+    Root --> Task[Task Config]
+    Root --> Serv[Service Config]
+    Root --> Chan[Channel Config]
+    Root --> Algo[Algorithm Config]
+    
+    Sim --> SD[duration: 1000]
+    Sim --> SA[area_size: 1000×1000]
+    
+    Veh --> VM[mission_vehicles: 45]
+    Veh --> VC[collaborative_vehicles: 18]
+    Veh --> VR[communication_range: 100m]
+    Veh --> VS[average_speed_kmh: 60]
+    
+    Infra --> IR[rsus: 10]
+    Infra --> IE[edge_servers: 5]
+    Infra --> IC[communication_range_ap: 150m]
+    Infra --> IB[bandwidth: 20 MHz]
+    
+    Task --> TD[data_size: 0.3-0.45 KB]
+    Task --> TC[computation: 0.3-0.45 MCycles]
+    Task --> TP[generation_prob: 0.7]
+    
+    Serv --> SF[total_services: 4]
+    Serv --> SZ[zipf_parameter: 0.8]
+    
+    Chan --> CP[tx_power_dbm: 16/3]
+    Chan --> CN[noise_power_dbm: -174]
+    Chan --> CE[path_loss_exponent: 3.76]
+    
+    Algo --> AC[Cuckoo Search]
+    Algo --> AD[Differential Evolution]
+    
+    AC --> ACN[nest_size: 25]
+    AC --> ACI[max_iterations: 25]
+    AC --> ACP[discovery_prob: 0.25]
+    AC --> ACS[step_size: 1.0]
+    AC --> ACL[levy_beta: 1.5]
+    
+    AD --> ADS[scaling_factor: 0.5]
+    AD --> ADC[crossover_prob: 0.9]
+    
+    style Root fill:#ffcc99,color:#000000,stroke:#333,stroke-width:2px
+    style Algo fill:#cc99ff,color:#000000,stroke:#333,stroke-width:2px
+    style AC fill:#99ccff,color:#000000,stroke:#333,stroke-width:1px
+    style AD fill:#99ccff,color:#000000,stroke:#333,stroke-width:1px
+    style Sim fill:#e1e1e1,color:#000000,stroke:#333,stroke-width:1px
+    style Veh fill:#e1e1e1,color:#000000,stroke:#333,stroke-width:1px
+    style Infra fill:#e1e1e1,color:#000000,stroke:#333,stroke-width:1px
+    style Task fill:#e1e1e1,color:#000000,stroke:#333,stroke-width:1px
+    style Serv fill:#e1e1e1,color:#000000,stroke:#333,stroke-width:1px
+    style Chan fill:#e1e1e1,color:#000000,stroke:#333,stroke-width:1px
+```
+
+## 10. Directory Structure Visualization
+
+```mermaid
+graph TD
+    Root[Ecora-final/] --> Alg[algorithms/]
+    Root --> Core[core/]
+    Root --> Models[models/]
+    Root --> Sim[simulation/]
+    Root --> Utils[utils/]
+    Root --> Tests[tests/]
+    Root --> Files[Configuration & Scripts]
+    Root --> Results[Pre-generated Results]
+    
+    Alg --> A1[stable_matching.py<br/>~300 lines]
+    Alg --> A2[cuckoo_search.py<br/>~600 lines]
+    Alg --> A3[differential_evolution.py<br/>~80 lines]
+    
+    Core --> C1[entities.py<br/>MV, CV, AP classes]
+    Core --> C2[network.py<br/>Network initialization]
+    Core --> C3[metrics.py<br/>Performance metrics]
+    
+    Models --> M1[task.py<br/>Task generation]
+    Models --> M2[cache.py<br/>Zipf distribution]
+    Models --> M3[social.py<br/>Social metrics]
+    Models --> M4[mobility.py<br/>Movement models]
+    
+    Sim --> S1[simulator.py<br/>Main simulator<br/>~340 lines]
+    Sim --> S2[scheduler.py<br/>Event scheduling]
+    Sim --> S3[events.py<br/>Event definitions]
+    
+    Utils --> U1[helpers.py<br/>Utility functions]
+    Utils --> U2[visualization.py<br/>Plotting utilities]
+    
+    Tests --> T1[test_algorithms.py<br/>Unit tests]
+    
+    Files --> F1[main.py<br/>~467 lines]
+    Files --> F2[config.yaml<br/>Parameters]
+    Files --> F3[requirements.txt<br/>Dependencies]
+    
+    Results --> R1[figure_2_traffic_density.png]
+    Results --> R2[figure_3_average_speed.png]
+    Results --> R3[figure_4a_pa.png]
+    Results --> R4[figure_4b_alpha3.png]
+    Results --> R5[figure_5_load_balance.png]
+    Results --> R6[timeseries_results.png]
+    
+    style Root fill:#ffcc99,color:#000000,stroke:#333,stroke-width:2px
+    style Alg fill:#cc99ff,color:#000000,stroke:#333,stroke-width:1px
+    style Models fill:#99ccff,color:#000000,stroke:#333,stroke-width:1px
+    style Sim fill:#99ff99,color:#000000,stroke:#333,stroke-width:1px
+    style Results fill:#ffff99,color:#000000,stroke:#333,stroke-width:1px
+    style Files fill:#e1e1e1,color:#000000,stroke:#333,stroke-width:1px
+    style Core fill:#e1e1e1,color:#000000,stroke:#333,stroke-width:1px
+    style Utils fill:#e1e1e1,color:#000000,stroke:#333,stroke-width:1px
+    style Tests fill:#e1e1e1,color:#000000,stroke:#333,stroke-width:1px
+```
+
+---
+
+
+```bash
+# Install Mermaid CLI
+npm install -g @mermaid-js/mermaid-cli
+
+# Generate images
+mmdc -i ECORA_DIAGRAMS.md -o diagrams/
+```
+
+
+
+**Created:** November 5, 2025  
+**Team:** Team 2 - NIT Surathkal  
+**For:** ECORA Implementation Project
 ---
 
 **End of README**
