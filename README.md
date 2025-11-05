@@ -9,7 +9,7 @@ This project implements **ECORA** (Efficient Caching and Offloading Resource All
 ## Team Members
 
 - **Aaditya Yadav** (Roll No: 231CS102)
-- **Amrit Lathar** (Roll No: 231CS209)  
+- **Amrit Lathar** (Roll No: 231CS207)  
 - **Himanshu Bande** (Roll No: 231CS225)
 - **Rudransh Kumar** (Roll No: 231CS249)
 
